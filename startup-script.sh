@@ -2,7 +2,8 @@
 
 # Install Dependencies
 apt-get update
-apt-get -y install git
+apt-get -y install git pip
+pip install opentuner
 
 cd /
 
