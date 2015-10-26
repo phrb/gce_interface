@@ -31,7 +31,7 @@ def add_firewall_tcp_rule(compute, project, port):
 
 def create_instance(compute, project, zone, name):
     source_disk_image = \
-        "projects/debian-cloud/global/images/debian-7-wheezy-v20150320"
+        "projects/just-clover-107416/global/images/debian8-opentuner-ready"
     machine_type = "zones/%s/machineTypes/n1-standard-1" % zone
     startup_script = open('startup-script.sh', 'r').read()
 

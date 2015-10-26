@@ -2,14 +2,6 @@
 
 echo "[INFO] Starting up Script" > startup.log
 
-# Install Dependencies
-apt-get update &>> startup.log
-apt-get -y install git python-dev python-pip &>> startup.log
-git clone https://github.com/jansel/opentuner.git &>> startup.log
-
-cd opentuner
-pip install -r requirements.txt &>> startup.log
-
 cd /
 
 # Clone Measurement Server Repository
