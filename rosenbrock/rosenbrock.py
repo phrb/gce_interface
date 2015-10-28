@@ -46,9 +46,9 @@ class PicklerInterface(MeasurementInterface):
 
         return self.run(new_result, new_input, limit)
 
-    def __init__(self, args, **kwargs):
+    def __init__(self, *args, **kwargs):
         print "I'm here init interface"
-        super(PicklerInterface, self).__init__(args, **kwargs)
+        super(PicklerInterface, self).__init__(*args, **kwargs)
 
 class Rosenbrock(PicklerInterface):
     def run(self, desired_result, input, limit):
