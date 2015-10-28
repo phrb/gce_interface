@@ -54,24 +54,9 @@ class Rosenbrock(PicklerInterface):
     def run(self, desired_result, input, limit):
         cfg = desired_result.configuration.data
         val = 0.0
-        if self.args.function == 'rosenbrock':
-            # the actual rosenbrock function:
-            for d in xrange(self.args.dimensions - 1):
-                x0 = cfg[d]
-                x1 = cfg[d + 1]
-                val += 100.0 * (x1 - x0 ** 2) ** 2 + (x0 - 1) ** 2
-        elif self.args.function == 'sphere':
-            for d in xrange(self.args.dimensions):
-                xi = cfg[d]
-                val += xi ** 2
-        elif self.args.function == 'beale':
-            assert self.args.dimensions == 2
-            assert self.args.domain == 4.5
-            x = cfg[0]
-            y = cfg[1]
-            val = ((1.5 - x + x * y) ** 2 +
-                         (2.25 - x + x * y ** 2) ** 2 +
-                         (2.625 - x + x * y ** 3) ** 2)
+        x0 = cfg[0]
+        x1 = cfg[1]
+        val += 100.0 * (x1 - x0 ** 2) ** 2 + (x0 - 1) ** 2
         return opentuner.resultsdb.models.Result(time=val)
 
     def manipulator(self):
