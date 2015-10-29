@@ -1,3 +1,5 @@
+import socket
+import pickle
 import sys
 import time
 
@@ -5,6 +7,7 @@ from six.moves import input
 from oauth2client.client import GoogleCredentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import *
+from time import sleep
 
 def list_instances(compute, project, zone):
     result = compute.instances().list(project=project, zone=zone).execute()
@@ -92,7 +95,7 @@ def delete_instance(compute, project, zone, name):
         instance=name).execute()
 
 def wait_for_operation(compute, project, zone, operations):
-    sys.stdout.write('Waiting for operations to finish')
+    sys.stdout.write('Waiting for operation to finish')
     while True:
         results = [compute.zoneOperations().get(
             project=project,
@@ -113,19 +116,81 @@ def wait_for_operation(compute, project, zone, operations):
 def get_natIP(instance, interface = 0, config = 0):
     return instance['networkInterfaces'][interface]['accessConfigs'][config]['natIP']
 
-def run(project, zone, instance_name):
+def start_server(instance_ip):
+    SERVER_IP      = instance_ip
+    SERVER_PORT    = 8080
+    BUFFER_SIZE    = 4096
+
+    attempts       = 13
+    delay          = 2
+
+    REPO           = " https://github.com/phrb/autotuning-gce.git"
+    DIST           = " tuner"
+
+    INTERFACE_PATH = " tuner/rosenbrock/rosenbrock.py"
+    INTERFACE_NAME = " Rosenbrock"
+
+    # Create a TCP/IP socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    # Connect the socket to the port where the server is listening
+    server_address = (str(SERVER_IP), SERVER_PORT)
+    print "Connecting to {0} : {1}".format(SERVER_IP, SERVER_PORT)
+
+    for _ in range(attempts):
+        try:
+            sock.connect(server_address)
+        except Exception as e:
+            if e.errno == 106:
+                print "Connected."
+                break
+            else:
+                print "Couldn't connect ({0}), trying again.".format(e.errno)
+                sleep(delay)
+                pass
+
+
+    msg = "start"
+    sock.sendall(msg)
+
+    # START
+    sock.recv(BUFFER_SIZE).strip()
+
+    msg = "clone" + REPO + DIST
+    sock.sendall(msg)
+
+    # CLONE
+    sock.recv(BUFFER_SIZE).strip()
+    sock.recv(BUFFER_SIZE).strip()
+
+    msg = "load" + INTERFACE_PATH + INTERFACE_NAME
+    sock.sendall(msg)
+
+    # LOAD
+    sock.recv(BUFFER_SIZE).strip()
+    sock.recv(BUFFER_SIZE).strip()
+
+    return sock
+
+
+def run(project, zone, instance_names):
+    BUFFER_SIZE    = 4096
     credentials = GoogleCredentials.get_application_default()
     compute = build('compute', 'v1', credentials=credentials)
 
     print('Checking Firewall allow-tcp rule')
     add_firewall_tcp_rule(compute, project, '8080')
 
-    print('Creating instance.')
+    print('Creating instances.')
 
-    operation = create_instance(compute, project, zone, instance_name)
-    wait_for_operation(compute, project, zone, [operation['name']])
+    for name in instance_names:
+        print "Creating {0}.".format(name)
+        operation = create_instance(compute, project, zone, name)
+        wait_for_operation(compute, project, zone, [operation['name']])
 
     instances = list_instances(compute, project, zone)
+
+    sockets   = []
 
     print('Instances in project %s and zone %s:' % (project, zone))
 
@@ -133,18 +198,33 @@ def run(project, zone, instance_name):
         print('Instance running at IP: ')
         print(' - ' + get_natIP(instance))
 
-    print('Press [ENTER] to kill instance.')
+        sockets.append(start_server(get_natIP(instance)))
+
+    print "Checking for instances' server status."
+    for sock in sockets:
+        msg = "status"
+        sock.sendall(msg)
+        print "sending: " + msg
+        print (sock.recv(BUFFER_SIZE).strip())
+
+
+    print('Test complete. Press [ENTER] to kill instances.')
     input()
 
-    print('Deleting instance.')
-    operation = delete_instance(compute, project, zone, instance_name)
-    wait_for_operation(compute, project, zone, [operation['name']])
+    print('Deleting instances.')
+    for name in instance_names:
+        operation = delete_instance(compute, project, zone, name)
+        wait_for_operation(compute, project, zone, [operation['name']])
 
 def main():
     project = "just-clover-107416"
     zone = "us-central1-f"
-    instance_name = 'demo-instance'
-    run(project, zone, instance_name)
+    instances = []
+
+    for i in range(8):
+        instances.append("instance-{0}".format(i))
+
+    run(project, zone, instances)
 
 if __name__ == '__main__':
     main()
