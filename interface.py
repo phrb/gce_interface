@@ -8,8 +8,68 @@ from oauth2client.client import GoogleCredentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import *
 from time import sleep
+from server_codes import *
 
 class GCEInterface:
+    def send_command(self, sock, command, arg1, arg2, arg3):
+        response = []
+        sock.sendall("{0} {1} {2} {3}".format(command, arg1, arg2, arg3))
+        print "sending: {0} {1} {2} {3}".format(command, arg1, arg2, arg3)
+
+        response.append((sock.recv(self.buffer_size).strip()).split(" "))
+        response.append((sock.recv(self.buffer_size).strip()).split(" "))
+        print response
+
+        return response
+
+    def send_simple_command(self, sock, command, arg):
+        response = []
+        sock.sendall("{0} {1}".format(command, arg))
+        print "sending: {0} {1}".format(command, arg)
+
+        response.append((sock.recv(self.buffer_size).strip()).split(" "))
+        print response
+
+        return response
+
+    def clone(self, sock, repo, dest):
+        response = self.send_command(sock, CLONE, repo, dest, "")
+        return response
+
+    def load(self, sock, path, name):
+        response = self.send_command(sock, LOAD, path, name, "")
+        return response
+
+    def measure(self, sock, config, config_input, limit):
+        response = self.send_command(sock, MEASURE, config, config_input, limit)
+        return response
+
+    def start(self, sock):
+        response = self.send_simple_command(sock, START, "")
+        return response
+
+    def stop(self, sock):
+        response = self.send_simple_command(sock, STOP, "")
+        return response
+
+    def disconnect(self, sock):
+        response = self.send_simple_command(sock, DISCONNECT, "")
+        sock.close()
+        return response
+
+    def status(self, sock):
+        response = self.send_simple_command(sock, STATUS, "")
+        return response
+
+    def shutdown(self, sock):
+        response = self.send_simple_command(sock, SHUTDOWN, "")
+        sock.close()
+        return response
+
+    def get(self, sock, result_id):
+        response = self.send_simple_command(sock, GET, result_id)
+        return response
+
     def list_instances(self):
         result = self.compute.instances().list(project=self.project, zone=self.zone).execute()
         return result['items']
@@ -32,7 +92,6 @@ class GCEInterface:
             self.compute.firewalls().insert(project = self.project,
                                             body    = config).execute()
             return
-        # TODO Logging
         print("Project %s already had a TCP rule" % (self.project))
 
     def create_instance(self, name):
@@ -139,31 +198,17 @@ class GCEInterface:
                     sleep(self.delay)
                     pass
 
-
-        msg = "start"
-        sock.sendall(msg)
-
-        # START
-        sock.recv(self.buffer_size).strip()
-
-        msg = "clone {0} {1}".format(self.repo, self.dest)
-        sock.sendall(msg)
-
-        # CLONE
-        sock.recv(self.buffer_size).strip()
-        sock.recv(self.buffer_size).strip()
-
-        msg = "load {0} {1}".format(self.interface_path, self.interface_name)
-        sock.sendall(msg)
-
-        # LOAD
-        sock.recv(self.buffer_size).strip()
-        sock.recv(self.buffer_size).strip()
+        self.start(sock)
+        self.clone(sock, self.repo, self.dest)
+        self.load(sock, self.interface_path, self.interface_name)
 
         return sock
 
 
     def create_all(self):
+        print('Checking Firewall allow-tcp rule')
+        self.add_firewall_tcp_rule()
+
         print('Creating instances.')
         operations = []
 
@@ -189,21 +234,29 @@ class GCEInterface:
 
         print "Checking for instances' server status."
         for sock in self.sockets:
-            msg = "status"
-            sock.sendall(msg)
-            print "sending: " + msg
-            print (sock.recv(self.buffer_size).strip())
+            self.status(sock)
 
     def disconnect_all(self):
         for sock in self.sockets:
-            shutdown(sock)
+            self.disconnect(sock)
+
+        self.sockets = []
+
+    def shutdown_all(self):
+        for sock in self.sockets:
+            self.shutdown(sock)
+
+        self.sockets = []
 
     def delete_all(self):
         print('Deleting instances.')
         operations = []
 
+        self.shutdown_all()
+
         for instance in self.instances:
             operations.append(self.delete_instance(instance['name'])['name'])
+            print "Deleting {0}.".format(instance['name'])
 
         self.wait_for_operation(operations)
 
@@ -224,6 +277,8 @@ class GCEInterface:
                  interface_name  = "Rosenbrock",
                  instance_number = 8):
 
+        # TODO Logging
+
         self.zone            = zone
         self.repo            = repo
         self.dest            = dest
@@ -236,14 +291,8 @@ class GCEInterface:
         self.interface_name  = interface_name
         self.instance_number = instance_number
 
-        # TODO Logging
         self.credentials = GoogleCredentials.get_application_default()
         self.compute     = build('compute', 'v1', credentials = self.credentials)
 
-        print('Checking Firewall allow-tcp rule')
-        self.add_firewall_tcp_rule()
-
-        self.instances = None
-        self.sockets   = None
-
-        # TODO Client loop
+        self.instances   = None
+        self.sockets     = None
