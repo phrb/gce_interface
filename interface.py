@@ -71,6 +71,60 @@ class GCEInterface:
         response = self.send_simple_command(sock, GET, result_id)
         return response
 
+    def is_ready(self, request, results):
+        request_id = request[0]
+        target     = request[1]
+
+        logging.info("Checking result {0} on worker {1}.".format(request_id, target))
+        sock = self.sockets[target]
+
+        response = self.get(sock, request_id)
+
+        if int(response[0][1]) == NO_ERROR and response[0][3] == request_id:
+            logging.info("Result was ready.")
+            result = pickle.loads(eval(response[0][4]))
+            results.append(result)
+            return True
+        else:
+            logging.info("Result was not ready.")
+            return False
+
+    def compute_results(self, args):
+        requests = []
+        results  = []
+
+        logging.info("Starting to compute the results.")
+        logging.info("Sending requests...")
+        for i in range(len(args)):
+            config     = pickle.dumps(args[i][0])
+            c_input    = pickle.dumps(args[i][1])
+            limit      = args[i][2]
+
+            target     = i % (len(self.sockets))
+            sock       = self.sockets[target]
+
+            response   = self.measure(sock, repr(config),
+                                      repr(c_input), limit)
+
+            while int(response[0][1]) != NO_ERROR:
+                logging.info("Measure returned an error: {0}".format(response[0]))
+                response = self.measure(sock, repr(config),
+                                        repr(c_input), limit)
+                logging.info("Trying again...")
+
+            request_id = response[1][3]
+
+            logging.info("Sent request {0} to worker {1}.".format(request_id, target))
+            requests.append((request_id, target))
+
+        logging.info("Done.")
+        logging.info("Waiting for results...")
+        while len(requests) > 0:
+            requests[:] = [r for r in requests if not self.is_ready(r, results)]
+
+        logging.info("Done.")
+        return results
+
     def list_instances(self):
         result = self.compute.instances().list(project=self.project, zone=self.zone).execute()
         return result['items']
