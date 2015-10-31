@@ -15,21 +15,21 @@ class GCEInterface:
     def send_command(self, sock, command, arg1, arg2, arg3):
         response = []
         sock.sendall("{0} {1} {2} {3}".format(command, arg1, arg2, arg3))
-        logging.info("Sending: {0} {1} {2} {3}".format(command, arg1, arg2, arg3))
+        self.logger.info("Sending: {0} {1} {2} {3}".format(command, arg1, arg2, arg3))
 
         response.append((sock.recv(self.buffer_size).strip()).split(" "))
         response.append((sock.recv(self.buffer_size).strip()).split(" "))
-        logging.info("Received: {0}".format(response))
+        self.logger.info("Received: {0}".format(response))
 
         return response
 
     def send_simple_command(self, sock, command, arg):
         response = []
         sock.sendall("{0} {1}".format(command, arg))
-        logging.info("Sending: {0} {1}".format(command, arg))
+        self.logger.info("Sending: {0} {1}".format(command, arg))
 
         response.append((sock.recv(self.buffer_size).strip()).split(" "))
-        logging.info("Received: {0}".format(response))
+        self.logger.info("Received: {0}".format(response))
 
         return response
 
@@ -76,26 +76,26 @@ class GCEInterface:
         target     = request[1]
         position   = request[2]
 
-        logging.info("Checking result {0} on worker {1}.".format(request_id, target))
+        self.logger.info("Checking result {0} on worker {1}.".format(request_id, target))
         sock = self.sockets[target]
 
         response = self.get(sock, request_id)
 
         if int(response[0][1]) == NO_ERROR and response[0][3] == request_id:
-            logging.info("Result was ready.")
+            self.logger.info("Result was ready.")
             result = pickle.loads(eval(response[0][4]))
             results[position] = result
             return True
         else:
-            logging.info("Result was not ready.")
+            self.logger.info("Result was not ready.")
             return False
 
     def compute_results(self, args):
         requests = []
         results  = [None] * len(args)
 
-        logging.info("Starting to compute the results.")
-        logging.info("Sending requests...")
+        self.logger.info("Starting to compute the results.")
+        self.logger.info("Sending requests...")
         for i in range(len(args)):
             config     = pickle.dumps(args[i][0])
             c_input    = pickle.dumps(args[i][1])
@@ -108,22 +108,22 @@ class GCEInterface:
                                       repr(c_input), limit)
 
             while int(response[0][1]) != NO_ERROR:
-                logging.info("Measure returned an error: {0}".format(response[0]))
+                self.logger.info("Measure returned an error: {0}".format(response[0]))
                 response = self.measure(sock, repr(config),
                                         repr(c_input), limit)
-                logging.info("Trying again...")
+                self.logger.info("Trying again...")
 
             request_id = response[1][3]
 
-            logging.info("Sent request {0} to worker {1}.".format(request_id, target))
+            self.logger.info("Sent request {0} to worker {1}.".format(request_id, target))
             requests.append((request_id, target, i))
 
-        logging.info("Done.")
-        logging.info("Waiting for results...")
+        self.logger.info("Done.")
+        self.logger.info("Waiting for results...")
         while len(requests) > 0:
             requests[:] = [r for r in requests if not self.is_ready(r, results)]
 
-        logging.info("Done.")
+        self.logger.info("Done.")
         return results
 
     def list_instances(self):
@@ -131,12 +131,12 @@ class GCEInterface:
         return result['items']
 
     def add_firewall_tcp_rule(self):
-        logging.info("Checking for firewall \"allow-tcp\" rule.")
+        self.logger.info("Checking for firewall \"allow-tcp\" rule.")
         try:
             firewall = self.compute.firewalls().get(project=self.project,
                                                firewall='allow-tcp').execute()
         except HttpError, err:
-            logging.info("Adding TCP rule to self.project {0}.".format(self.project))
+            self.logger.info("Adding TCP rule to self.project {0}.".format(self.project))
             config = {
                 'kind': 'compute#firewall',
                 'name': 'allow-tcp',
@@ -149,7 +149,7 @@ class GCEInterface:
             self.compute.firewalls().insert(project = self.project,
                                             body    = config).execute()
             return
-        logging.info("Project {0} already had a TCP rule.".format(self.project))
+        self.logger.info("Project {0} already had a TCP rule.".format(self.project))
 
     def create_instance(self, name):
         source_disk_image = \
@@ -214,7 +214,7 @@ class GCEInterface:
             instance = name).execute()
 
     def wait_for_operation(self, operations):
-        logging.info("Waiting for operations to finish...")
+        self.logger.info("Waiting for operations to finish...")
         while True:
             results = [self.compute.zoneOperations().get(
                 project   = self.project,
@@ -222,7 +222,7 @@ class GCEInterface:
                 operation = operation).execute() for operation in operations ]
 
             if all(result['status'] == 'DONE' for result in results):
-                logging.info("Done.")
+                self.logger.info("Done.")
                 for result in results:
                     if 'error' in result:
                         raise Exception(result['error'])
@@ -237,17 +237,17 @@ class GCEInterface:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         server_address = (str(instance_ip), self.tcp_port)
-        logging.info("Connecting to {0} : {1}".format(instance_ip, self.tcp_port))
+        self.logger.info("Connecting to {0} : {1}".format(instance_ip, self.tcp_port))
 
         for _ in range(self.attempts):
             try:
                 sock.connect(server_address)
             except Exception as e:
                 if e.errno == 106:
-                    logging.info("Connected.")
+                    self.logger.info("Connected.")
                     break
                 else:
-                    logging.info("Couldn't connect ({0}), trying again.".format(e.errno))
+                    self.logger.info("Couldn't connect ({0}), trying again.".format(e.errno))
                     sleep(self.delay)
                     pass
 
@@ -261,30 +261,30 @@ class GCEInterface:
     def create_all(self):
         self.add_firewall_tcp_rule()
 
-        logging.info("Creating instances.")
+        self.logger.info("Creating instances.")
         operations = []
 
         for i in range(self.instance_number):
             operations.append(self.create_instance("instance-{0}".format(i))['name'])
-            logging.info("Creating instance-{0}.".format(i))
+            self.logger.info("Creating instance-{0}.".format(i))
 
         self.wait_for_operation(operations)
 
         self.instances = self.list_instances()
 
     def connect_all(self):
-        logging.info("Connecting to instances.")
+        self.logger.info("Connecting to instances.")
         self.sockets = []
 
-        logging.info("Instances in project {0} and zone {1}:".format(self.project, self.zone))
+        self.logger.info("Instances in project {0} and zone {1}:".format(self.project, self.zone))
 
         for instance in self.instances:
-            logging.info("Instance running at IP: ")
-            logging.info(" - {0}".format(self.get_natIP(instance)))
+            self.logger.info("Instance running at IP: ")
+            self.logger.info(" - {0}".format(self.get_natIP(instance)))
 
             self.sockets.append(self.start_server(self.get_natIP(instance)))
 
-        logging.info("Checking for instances' server status.")
+        self.logger.info("Checking for instances' server status.")
         for sock in self.sockets:
             self.status(sock)
 
@@ -301,14 +301,14 @@ class GCEInterface:
         self.sockets = []
 
     def delete_all(self):
-        logging.info("Deleting all instances.")
+        self.logger.info("Deleting all instances.")
         operations = []
 
         self.shutdown_all()
 
         for instance in self.instances:
             operations.append(self.delete_instance(instance['name'])['name'])
-            logging.info("Deleting: {0}.".format(instance['name']))
+            self.logger.info("Deleting: {0}.".format(instance['name']))
 
         self.wait_for_operation(operations)
 
@@ -329,13 +329,15 @@ class GCEInterface:
                  interface_name  = "Rosenbrock",
                  instance_number = 8):
 
-        logging.basicConfig(filename = "GCEInterface.log",
+        self.logger = logging.getLogger("GCEInterface")
+
+        self.logger.basicConfig(filename = "GCEInterface.log",
                             level = logging.DEBUG,
                             filemode = "w",
                             format = "%(asctime)s %(message)s",
                             datefmt = "%d/%m/%Y %I:%M:%S %p")
 
-        logging.info("Initializing GCEInterface.")
+        self.logger.info("Initializing GCEInterface.")
 
         self.zone            = zone
         self.repo            = repo
@@ -349,7 +351,7 @@ class GCEInterface:
         self.interface_name  = interface_name
         self.instance_number = instance_number
 
-        logging.info("Getting credentials and \"compute\"")
+        self.logger.info("Getting credentials and \"compute\"")
 
         self.credentials = GoogleCredentials.get_application_default()
         self.compute     = build('compute', 'v1', credentials = self.credentials)
@@ -357,5 +359,5 @@ class GCEInterface:
         self.instances   = None
         self.sockets     = None
 
-        logging.info("Initialization Complete.")
+        self.logger.info("Initialization Complete.")
 
