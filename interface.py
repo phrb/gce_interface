@@ -325,7 +325,7 @@ class GCEInterface:
                  attempts        = 13,
                  tcp_port        = 8080,
                  buffer_size     = 4096,
-                 interface_path  = "tuner/rosenbrock/rosenbrock.py",
+                 interface_path  = "rosenbrock/rosenbrock.py",
                  interface_name  = "Rosenbrock",
                  instance_number = 8):
 
@@ -345,7 +345,7 @@ class GCEInterface:
         self.attempts        = attempts
         self.tcp_port        = tcp_port
         self.buffer_size     = buffer_size
-        self.interface_path  = interface_path
+        self.interface_path  = "{0}/{1}".format(dest, interface_path)
         self.interface_name  = interface_name
         self.instance_number = instance_number
 
