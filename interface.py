@@ -74,6 +74,7 @@ class GCEInterface:
     def is_ready(self, request, results):
         request_id = request[0]
         target     = request[1]
+        position   = request[2]
 
         logging.info("Checking result {0} on worker {1}.".format(request_id, target))
         sock = self.sockets[target]
@@ -83,7 +84,7 @@ class GCEInterface:
         if int(response[0][1]) == NO_ERROR and response[0][3] == request_id:
             logging.info("Result was ready.")
             result = pickle.loads(eval(response[0][4]))
-            results.append(result)
+            results[position] = result
             return True
         else:
             logging.info("Result was not ready.")
@@ -91,7 +92,7 @@ class GCEInterface:
 
     def compute_results(self, args):
         requests = []
-        results  = []
+        results  = [None] * len(args)
 
         logging.info("Starting to compute the results.")
         logging.info("Sending requests...")
@@ -115,7 +116,7 @@ class GCEInterface:
             request_id = response[1][3]
 
             logging.info("Sent request {0} to worker {1}.".format(request_id, target))
-            requests.append((request_id, target))
+            requests.append((request_id, target, i))
 
         logging.info("Done.")
         logging.info("Waiting for results...")
