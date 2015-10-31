@@ -331,11 +331,13 @@ class GCEInterface:
 
         self.logger = logging.getLogger("GCEInterface")
 
-        self.logger.basicConfig(filename = "GCEInterface.log",
-                            level = logging.DEBUG,
-                            filemode = "w",
-                            format = "%(asctime)s %(message)s",
-                            datefmt = "%d/%m/%Y %I:%M:%S %p")
+        formatter   = logging.Formatter("%(asctime)s : %(message)s")
+        fileHandler = logging.FileHandler("GCEInterface.log", mode="w")
+
+        fileHandler.setFormatter(formatter)
+
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.addHandler(fileHandler)
 
         self.logger.info("Initializing GCEInterface.")
 
