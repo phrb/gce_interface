@@ -153,8 +153,8 @@ class GCEInterface:
 
     def create_instance(self, name):
         source_disk_image = \
-            "projects/just-clover-107416/global/images/debian8-opentuner-ready"
-        machine_type = "zones/%s/machineTypes/n1-standard-1" % self.zone
+            "projects/{0}/global/images/opentuner-ready-debian8".format(self.project)
+        machine_type = "zones/{0}/machineTypes/n1-standard-1".format(self.zone)
         startup_script = open('startup-script.sh', 'r').read()
 
         config = {
