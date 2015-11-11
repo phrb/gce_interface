@@ -328,7 +328,7 @@ class GCEInterface:
                  project         = "just-clover-107416",
                  attempts        = 13,
                  tcp_port        = 8080,
-                 buffer_size     = 4096,
+                 buffer_size     = 8192,
                  interface_path  = "rosenbrock/rosenbrock.py",
                  interface_name  = "Rosenbrock",
                  instance_number = 8):
