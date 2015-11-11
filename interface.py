@@ -107,7 +107,7 @@ class GCEInterface:
             response   = self.measure(sock, repr(config),
                                       repr(c_input), limit)
 
-            while int(response[0][1]) != NO_ERROR:
+            while response[0][1] != str(NO_ERROR):
                 self.logger.debug("Measure returned an error: {0}".format(response[0]))
                 response = self.measure(sock, repr(config),
                                         repr(c_input), limit)
