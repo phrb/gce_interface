@@ -12,13 +12,20 @@ from time import sleep
 from server_codes import *
 
 class GCEInterface:
+    def recv_response(self, sock, delim = "\n"):
+        while True:
+            self.message_buffer += sock.recv(self.buffer_size)
+            if self.message_buffer.find(delim) != -1:
+                line, self.message_buffer = self.message_buffer.split("\n", 1)
+                return line
+
     def send_command(self, sock, command, arg1, arg2, arg3):
         response = []
         sock.sendall("{0} {1} {2} {3}".format(command, arg1, arg2, arg3))
         self.logger.debug("Sending: {0} {1} {2} {3}".format(command, arg1, arg2, arg3))
 
-        response.append((sock.recv(self.buffer_size).strip()).split(" "))
-        response.append((sock.recv(self.buffer_size).strip()).split(" "))
+        response.append((self.recv_response(sock)).split(" "))
+        response.append((self.recv_response(sock)).split(" "))
         self.logger.debug("Received: {0}".format(response))
 
         return response
@@ -28,7 +35,7 @@ class GCEInterface:
         sock.sendall("{0} {1}".format(command, arg))
         self.logger.debug("Sending: {0} {1}".format(command, arg))
 
-        response.append((sock.recv(self.buffer_size).strip()).split(" "))
+        response.append((self.recv_response(sock)).split(" "))
         self.logger.debug("Received: {0}".format(response))
 
         return response
@@ -107,7 +114,8 @@ class GCEInterface:
             response   = self.measure(sock, repr(config),
                                       repr(c_input), limit)
 
-            while len(response[0]) < 2 and response[0][1] != str(NO_ERROR):
+            while (len(response[0]) < 2 and response[0][1] != str(NO_ERROR) and
+                   len(response[1]) < 2 and response[1][1] != str(NO_ERROR)):
                 self.logger.debug("Measure returned an error: {0}".format(response[0]))
                 response = self.measure(sock, repr(config),
                                         repr(c_input), limit)
@@ -328,7 +336,7 @@ class GCEInterface:
                  project         = "just-clover-107416",
                  attempts        = 13,
                  tcp_port        = 8080,
-                 buffer_size     = 16384,
+                 buffer_size     = 8192,
                  interface_path  = "rosenbrock/rosenbrock.py",
                  interface_name  = "Rosenbrock",
                  instance_number = 8):
@@ -362,6 +370,8 @@ class GCEInterface:
         self.interface_path  = "{0}/{1}".format(dest, interface_path)
         self.interface_name  = interface_name
         self.instance_number = instance_number
+
+        self.message_buffer  = ""
 
         self.logger.debug("Getting credentials and \"compute\"")
 
