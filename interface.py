@@ -15,13 +15,14 @@ class GCEInterface:
     def recv_response(self, sock, delim = "\n"):
         while True:
             self.message_buffer += sock.recv(self.buffer_size)
+            self.logger.debug(self.message_buffer)
             if self.message_buffer.find(delim) != -1:
                 line, self.message_buffer = self.message_buffer.split("\n", 1)
                 return line
 
     def send_command(self, sock, command, arg1, arg2, arg3):
         response = []
-        sock.sendall("{0} {1} {2} {3}".format(command, arg1, arg2, arg3))
+        sock.sendall("{0} {1} {2} {3}\n".format(command, arg1, arg2, arg3))
         self.logger.debug("Sending: {0} {1} {2} {3}".format(command, arg1, arg2, arg3))
 
         response.append((self.recv_response(sock)).split(" "))
@@ -32,7 +33,7 @@ class GCEInterface:
 
     def send_simple_command(self, sock, command, arg):
         response = []
-        sock.sendall("{0} {1}".format(command, arg))
+        sock.sendall("{0} {1}\n".format(command, arg))
         self.logger.debug("Sending: {0} {1}".format(command, arg))
 
         response.append((self.recv_response(sock)).split(" "))
