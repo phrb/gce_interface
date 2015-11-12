@@ -349,7 +349,7 @@ class GCEInterface:
 
         fileHandler.setFormatter(formatter)
 
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.INFO)
         self.logger.addHandler(fileHandler)
 
         self.logger.info("Initializing GCEInterface.")
