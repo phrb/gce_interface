@@ -135,6 +135,57 @@ class GCEInterface:
         self.logger.debug("Done.")
         return results
 
+    def request_results(self, args):
+        requests = []
+        results  = [None] * len(args)
+
+        self.logger.debug("Starting to compute the results.")
+        self.logger.debug("Sending requests...")
+        for i in range(len(args)):
+            config     = pickle.dumps(args[i][0])
+            c_input    = pickle.dumps(args[i][1])
+            limit      = args[i][2]
+
+            target     = i % (len(self.sockets))
+            sock       = self.sockets[target]
+
+            response   = self.measure(sock, repr(config),
+                                      repr(c_input), limit)
+
+            while (len(response[0]) < 2 and response[0][1] != str(NO_ERROR) and
+                   len(response[1]) < 2 and response[1][1] != str(NO_ERROR)):
+                self.logger.debug("Measure returned an error: {0}".format(response[0]))
+                response = self.measure(sock, repr(config),
+                                        repr(c_input), limit)
+                self.logger.debug("Trying again...")
+
+            request_id = response[1][3]
+
+            self.logger.debug("Sent request {0} to worker {1}.".format(request_id, target))
+            requests.append((request_id, target, i))
+
+        self.logger.debug("Done.")
+        self.logger.debug("Returning requests to client.")
+        return requests
+
+    def query_result(self, request):
+        request_id = request[0]
+        target     = request[1]
+        position   = request[2]
+
+        self.logger.debug("Checking result {0} on worker {1}.".format(request_id, target))
+        sock = self.sockets[target]
+
+        response = self.get(sock, request_id)
+
+        if int(response[0][1]) == NO_ERROR and response[0][3] == request_id:
+            self.logger.debug("Result was ready.")
+            result = pickle.loads(eval(response[0][4]))
+            return result
+        else:
+            self.logger.debug("Result was not ready.")
+            return None
+
     def list_instances(self):
         result = self.compute.instances().list(project=self.project, zone=self.zone).execute()
         return result['items']
