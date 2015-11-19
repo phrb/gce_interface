@@ -171,7 +171,6 @@ class GCEInterface:
     def query_result(self, request):
         request_id = request[0]
         target     = request[1]
-        position   = request[2]
 
         self.logger.debug("Checking result {0} on worker {1}.".format(request_id, target))
         sock = self.sockets[target]
